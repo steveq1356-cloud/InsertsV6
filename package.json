@@ -1,0 +1,13 @@
+{
+  "name": "insertpress-planner",
+  "version": "0.6.0",
+  "description": "Pick heat-set insert holes on an STL and generate GRBL G-code for an automated insert press.",
+  "private": true,
+  "scripts": {
+    "test": "node test/run-tests.js",
+    "example": "node tools/make-example.js",
+    "serve": "npx --yes http-server -c-1 .",
+    "ui-test": "node tools/ui-test.js"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>InsertPress Planner</title>
+  <meta name="description" content="Place parts, pick heat-set insert holes, preview the press, and run it on a GRBL machine.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='9' y='4' width='14' height='24' rx='2' fill='%23B8862C'/%3E%3Cpath d='M9 11h14M9 17h14M9 23h14' stroke='%238a6420' stroke-width='2'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..100,400..800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css?v=6">
+  <link rel="stylesheet" href="css/layout.css?v=6">
+  <link rel="stylesheet" href="css/panels.css?v=6">
+  <link rel="stylesheet" href="css/run.css?v=6">
+</head>
+<body data-screen="start">
+  <header class="top">
+    <button class="brand" id="btn-home" title="Start screen" aria-label="InsertPress, start screen">
+      <svg class="brand-mark" viewBox="0 0 20 28" aria-hidden="true">
+        <rect x="1" y="1" width="18" height="26" rx="3" fill="#c99a3b"/>
+        <path d="M1 8h18M1 14h18M1 20h18" stroke="#8a6420" stroke-width="1.6"/>
+        <rect x="7" y="1" width="6" height="26" fill="#8a6420" opacity=".5"/>
+      </svg>
+      <span class="brand-name">InsertPress</span><span class="ver">v6</span>
+    </button>
+    <div class="crumb" id="crumb" hidden>
+      <span class="file-chip" id="file-chip"></span>
+      <div class="history">
+        <button class="icon-btn on-dark" id="btn-undo" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
+          <svg viewBox="0 0 20 20"><path d="M7.5 5L3.5 9l4 4"/><path d="M4 9h8a4.5 4.5 0 0 1 0 9H9"/></svg></button>
+        <button class="icon-btn on-dark" id="btn-redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled>
+          <svg viewBox="0 0 20 20"><path d="M12.5 5l4 4-4 4"/><path d="M16 9H8a4.5 4.5 0 0 0 0 9h3"/></svg></button>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="btn on-dark" id="btn-save-job" hidden title="Save the job as a file">Save job</button>
+      <button class="btn on-dark" id="btn-setup" title="Bed, fence, iron, float, and tray">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="2.6"/><path d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6"/></svg>
+        <span>Machine setup</span></button>
+      <button class="mach-btn" id="btn-machine" data-tone="off" title="Connect, jog, and run the press">
+        <i class="led" aria-hidden="true"></i><span class="mach-l">Machine</span><span class="mach-state" id="mach-state">Not connected</span></button>
+      <button class="icon-btn on-dark" id="btn-keys" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">
+        <svg viewBox="0 0 20 20"><rect x="2.5" y="5" width="15" height="10" rx="2"/><path d="M5.5 8h1M9.5 8h1M13.5 8h1M6 12h8"/></svg></button>
+    </div>
+  </header>
+
+  <!-- ============ START ============ -->
+  <main class="start" id="scr-start" aria-label="Start">
+    <div class="start-in">
+      <div class="start-top">
+        <div class="drop" id="drop-zone">
+          <svg viewBox="0 0 48 48" aria-hidden="true" class="drop-ico"><path d="M24 31V11M16 19l8-8 8 8"/><path d="M9 29v7a3 3 0 0 0 3 3h24a3 3 0 0 0 3-3v-7"/></svg>
+          <h1>Open an STL</h1>
+          <p>Drop it anywhere, or choose a file. Every hole that fits an insert is found for you.</p>
+          <div class="drop-acts">
+            <label class="btn primary" for="file-stl">Choose a file</label>
+            <label class="btn" for="file-job">Open a saved job</label>
+          </div>
+        </div>
+        <div class="start-side">
+          <div class="resume card" id="resume" hidden>
+            <div class="resume-thumb" id="resume-thumb"></div>
+            <div class="resume-main">
+              <span class="eyebrow">Pick up where you left off</span>
+              <b id="resume-name"></b>
+              <span class="sub" id="resume-sub"></span>
+            </div>
+            <div class="resume-acts">
+              <button class="btn primary" id="btn-resume">Continue</button>
+              <button class="btn quiet small" id="btn-resume-x">Dismiss</button>
+            </div>
+          </div>
+          <div class="setup-card card" id="setup-card">
+            <span class="eyebrow">Machine</span>
+            <b id="setup-card-t">Set up your machine</b>
+            <p class="sub" id="setup-card-d">Two minutes: bed size, fence, iron, float sensor, and the insert tray. Every answer has a sensible default.</p>
+            <button class="btn" id="btn-setup-2">Start setup</button>
+          </div>
+        </div>
+      </div>
+      <section class="shelf" id="recent-shelf" hidden>
+        <div class="shelf-h"><h2>Recent</h2><button class="btn quiet small" id="btn-recent-clear">Clear</button></div>
+        <div class="cards" id="recent"></div>
+      </section>
+      <section class="shelf">
+        <div class="shelf-h"><h2>Examples</h2><span class="sub">Each one shows off a feature</span></div>
+        <div class="cards" id="gallery"></div>
+      </section>
+    </div>
+  </main>
+
+  <!-- ============ WORKSPACE (job + run) ============ -->
+  <div class="app" id="scr-work">
+    <aside class="side">
+      <div class="job-side" id="job-side">
+        <nav class="steps" role="tablist" aria-label="Steps">
+          <button class="step" role="tab" data-step="part" aria-selected="true"><span class="num">1</span>Part</button>
+          <button class="step" role="tab" data-step="holes" aria-selected="false"><span class="num">2</span>Holes<span class="pill" id="pill-holes" hidden></span></button>
+          <button class="step" role="tab" data-step="review" aria-selected="false"><span class="num">3</span>Review<span class="pill warn" id="pill-issues" hidden></span></button>
+        </nav>
+        <p class="next-hint" id="next-hint" aria-live="polite"></p>
+
+        <div class="panes" id="panes">
+          <!-- 1 Part -->
+          <section class="pane" id="pane-part" role="tabpanel">
+            <div class="part-card">
+              <div class="pc-thumb" id="part-thumb" aria-hidden="true"></div>
+              <div class="pc-main"><h2 id="part-name">part</h2><p class="sub" id="part-sub"></p></div>
+              <label class="btn small" for="file-stl">Replace</label>
+            </div>
+
+            <section class="card">
+              <header class="card-h"><h3>Lay flat</h3><span class="aside">Insert holes must point up</span></header>
+              <div class="btn-row">
+                <button class="btn small" data-rot="x" title="Quarter turn about X">Turn on X</button>
+                <button class="btn small" data-rot="y" title="Quarter turn about Y">Turn on Y</button>
+                <button class="btn small toggle" id="btn-face" aria-pressed="false" title="Click the face that should sit on the bed (B)">
+                  <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 13l7 4 7-4-7-4z"/><path d="M10 9V2.5M7.5 5L10 2.5 12.5 5"/></svg>Pick the bottom face</button>
+              </div>
+              <details class="adv"><summary>Advanced</summary>
+                <div class="adv-in">
+                  <div class="row-between"><span>File units</span>
+                    <span class="seg units" role="radiogroup" aria-label="File units">
+                      <button class="seg-btn" data-units="1" aria-checked="true" role="radio">mm</button>
+                      <button class="seg-btn" data-units="25.4" aria-checked="false" role="radio">inch</button>
+                    </span></div>
+                  <div class="row-between"><span>Orientation</span><button class="btn small" id="btn-orient-reset">Back to as drawn</button></div>
+                  <div class="cells c3" id="part-stats"></div>
+                </div>
+              </details>
+            </section>
+
+            <section class="card">
+              <header class="card-h"><h3>Position</h3>
+                <button class="lock-btn" id="btn-lock" aria-pressed="false" title="Lock the position so it can't be dragged">
+                  <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4.5" y="9" width="11" height="8" rx="1.5"/><path class="shackle" d="M7 9V6.5a3 3 0 0 1 6 0V9"/></svg><span>Unlocked</span></button></header>
+              <div class="align" role="group" aria-label="Align">
+                <button class="al" data-align="corner" title="Into the fence corner (X 0, Y 0)">
+                  <svg viewBox="0 0 28 22" aria-hidden="true"><path class="fence" d="M3 2v17h23"/><rect x="5" y="9" width="9" height="8" rx="1"/></svg><span>Fence corner</span></button>
+                <button class="al" data-align="left" title="Against the left fence (X 0)">
+                  <svg viewBox="0 0 28 22" aria-hidden="true"><path class="fence" d="M3 2v18"/><rect x="5" y="7" width="9" height="8" rx="1"/></svg><span>Left fence</span></button>
+                <button class="al" data-align="front" title="Against the front fence (Y 0)">
+                  <svg viewBox="0 0 28 22" aria-hidden="true"><path class="fence" d="M2 19h24"/><rect x="10" y="9" width="9" height="8" rx="1"/></svg><span>Front fence</span></button>
+                <button class="al" data-align="center" title="Centre on the bed">
+                  <svg viewBox="0 0 28 22" aria-hidden="true"><rect class="fence dash" x="2.5" y="2.5" width="23" height="17" rx="1.5"/><rect x="9.5" y="7" width="9" height="8" rx="1"/></svg><span>Centre</span></button>
+              </div>
+              <div class="trio">
+                <label class="fld"><span>X</span><input type="number" id="pos-x" step="1"><i>mm</i></label>
+                <label class="fld"><span>Y</span><input type="number" id="pos-y" step="1"><i>mm</i></label>
+                <label class="fld"><span>Turn</span><input type="number" id="pos-rot" step="15"><i>°</i></label>
+              </div>
+              <p class="fine">Drag the part to move it. It snaps to the fence, the bed edges and centre, the grid, and the tray. Hold <kbd>Alt</kbd> to drag freely. The ring at its corner turns it.</p>
+            </section>
+
+            <section class="card">
+              <header class="card-h"><h3>Copies</h3><span class="aside" id="copies-n"></span></header>
+              <div class="trio">
+                <label class="fld"><span>Across</span><input type="number" id="cp-nx" min="1" max="20" step="1"></label>
+                <label class="fld"><span>Rows</span><input type="number" id="cp-ny" min="1" max="20" step="1"></label>
+                <label class="fld"><span>Gap</span><input type="number" id="cp-gap" min="0" step="1"><i>mm</i></label>
+              </div>
+              <div class="btn-row">
+                <button class="btn small" id="btn-autofill" title="As many copies as fit the travel, keeping off the tray">
+                  <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="2.5" width="6" height="6" rx="1"/><rect x="11.5" y="2.5" width="6" height="6" rx="1"/><rect x="2.5" y="11.5" width="6" height="6" rx="1"/><rect x="11.5" y="11.5" width="6" height="6" rx="1" stroke-dasharray="2 2"/></svg>Fill the bed</button>
+                <button class="btn small quiet" id="btn-one" title="Back to a single part">Just one</button>
+              </div>
+              <p class="array-info" id="array-info"></p>
+            </section>
+          </section>
+
+          <!-- 2 Holes -->
+          <section class="pane" id="pane-holes" role="tabpanel" hidden>
+            <div class="holes-sum">
+              <p class="count-line" id="count-line"></p>
+              <div class="btn-row">
+                <button class="btn small" id="btn-press-all">Press all</button>
+                <button class="btn small" id="btn-press-none">None</button>
+                <button class="btn small toggle push-r" id="btn-tools" aria-pressed="false" aria-controls="tools-box" title="Filter, sort, select several, reorder">
+                  <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h9M15 5h2M3 10h3M9 10h8M3 15h7M13 15h4"/><circle cx="13.5" cy="5" r="1.6"/><circle cx="7.5" cy="10" r="1.6"/><circle cx="11.5" cy="15" r="1.6"/></svg>Tools</button>
+              </div>
+            </div>
+            <div class="tools-box" id="tools-box" hidden>
+              <div class="chips" id="size-chips" aria-label="Show only these sizes"></div>
+              <div class="list-ctl">
+                <span class="seg filt" id="hole-filter" role="group" aria-label="Show"></span>
+                <label class="sort-ctl"><span>Sort</span><select id="hole-sort" aria-label="Sort holes by"></select>
+                  <button class="dir-btn" id="hole-dir" title="Reverse the sort" aria-label="Reverse the sort" hidden>
+                    <svg viewBox="0 0 20 20"><path d="M7 4v12M3.5 7.5L7 4l3.5 3.5M13 16V4M9.5 12.5L13 16l3.5-3.5"/></svg></button></label>
+              </div>
+              <div class="btn-row">
+                <button class="btn small" id="btn-optimize" disabled title="Shortest travel">Shortest path</button>
+                <button class="btn small" id="btn-use-sort" hidden title="Make this sort the press order">Press in this order</button>
+                <button class="btn small toggle" id="btn-add" aria-pressed="false">
+                  <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="M10 1.5v4M10 14.5v4M1.5 10h4M14.5 10h4"/></svg>Place by hand</button>
+              </div>
+              <details class="adv" id="range-adv"><summary>Hole size range</summary>
+                <div class="adv-in duo" id="range-form"></div></details>
+              <div class="list-head" id="list-head" hidden>
+                <label class="ck" title="Select everything shown"><input type="checkbox" id="sel-all" aria-label="Select everything shown"><span></span></label>
+                <span class="shown" id="shown-n"></span>
+                <button class="btn small quiet" id="btn-press-shown">Press shown</button>
+                <button class="btn small quiet" id="btn-skip-shown">Skip shown</button>
+              </div>
+            </div>
+            <div class="bulk" id="bulk" hidden>
+              <b id="bulk-n"></b>
+              <button class="btn small" id="bk-press">Press</button>
+              <button class="btn small" id="bk-skip">Skip</button>
+              <select id="bk-insert" aria-label="Insert for the selected holes"></select>
+              <label class="bk-sink" title="Finish this far below the surface">Sink<input type="number" step="0.05" id="bk-sink" placeholder="–" aria-label="Finish depth for the selected holes, mm">mm</label>
+              <button class="btn small quiet" id="bk-del" hidden>Delete</button>
+              <button class="x-btn" id="bk-clear" aria-label="Clear the selection" title="Clear the selection (Esc)"><svg viewBox="0 0 12 12"><path d="M2 2l8 8M10 2l-8 8"/></svg></button>
+            </div>
+            <ol class="holes" id="hole-list" aria-label="Holes"></ol>
+            <div class="empty" id="order-empty" hidden></div>
+            <p class="fine" id="ignored-note"></p>
+          </section>
+
+          <!-- 3 Review -->
+          <section class="pane" id="pane-review" role="tabpanel" hidden>
+            <div class="hero-time">
+              <b id="time-big">–</b>
+              <span id="time-sub">Add holes to see the job time.</span>
+            </div>
+            <div class="time-bar" id="time-bar" aria-hidden="true"></div>
+            <ul class="time-legend" id="time-legend"></ul>
+
+            <ul class="issues" id="issues"></ul>
+
+            <section class="card">
+              <header class="card-h"><h3>Press</h3></header>
+              <div class="duo">
+                <label class="lab">Plastic<select id="job-material"></select></label>
+                <label class="lab">Iron<span class="num-in"><input type="number" id="job-temp" step="5"><span>°C</span></span></label>
+              </div>
+              <div class="lab feed-lab">Inserts come from
+                <span class="seg wide" id="job-feed" role="radiogroup" aria-label="Inserts come from">
+                  <button class="seg-btn" data-feed="hand" role="radio">By hand</button>
+                  <button class="seg-btn" data-feed="tray" role="radio">The tray</button>
+                </span></div>
+              <p class="feed-note" id="feed-note"></p>
+              <details class="adv" id="job-adv"><summary>Advanced</summary><div class="adv-in" id="job-adv-form"></div></details>
+            </section>
+
+            <section class="card">
+              <header class="card-h"><h3>Parts list</h3><span class="aside" id="bom-aside"></span></header>
+              <table class="bom" id="bom"></table>
+            </section>
+
+            <div class="actions">
+              <button class="btn primary block" id="btn-run-machine" disabled>
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4l10 6-10 6z"/></svg>Go to the machine</button>
+              <button class="btn block" id="btn-export" disabled>Download G-code</button>
+              <div class="more-acts">
+                <button class="btn small quiet" id="btn-air" disabled title="Same job 20 mm higher, for a dry run">Air pass</button>
+                <button class="btn small quiet" id="btn-template" disabled title="1:1 sheet to set parts on the bed">Template</button>
+                <button class="btn small quiet" id="btn-copy" disabled>Copy G-code</button>
+                <button class="btn small quiet" id="btn-save-job-2" disabled>Save job</button>
+              </div>
+            </div>
+            <details class="code-box" id="code-box"><summary>G-code <span class="fine" id="code-lines"></span></summary>
+              <div class="code" id="code"></div></details>
+          </section>
+        </div>
+
+        <footer class="side-foot">
+          <button class="btn" id="btn-back"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12 4l-6 6 6 6"/></svg>Back</button>
+          <button class="btn primary" id="btn-next">Next<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4l6 6-6 6"/></svg></button>
+        </footer>
+      </div>
+
+      <div class="run-side" id="run-side" hidden></div>
+    </aside>
+
+    <main class="stage" id="stage" aria-label="Bed view">
+      <div id="viewport"></div>
+
+      <div class="tool-rail" id="tool-rail" role="toolbar" aria-label="Tools">
+        <button class="tool" data-tool="move" aria-pressed="false" title="Move parts (M)">
+          <svg viewBox="0 0 20 20"><path d="M10 2v16M2 10h16M10 2l-2.5 2.5M10 2l2.5 2.5M10 18l-2.5-2.5M10 18l2.5-2.5M2 10l2.5-2.5M2 10l2.5 2.5M18 10l-2.5-2.5M18 10l-2.5 2.5"/></svg><span>Move</span><kbd>M</kbd></button>
+        <button class="tool" data-tool="select" aria-pressed="true" title="Pick holes (V)">
+          <svg viewBox="0 0 20 20"><path d="M5 3l10 6.5-4.6 1.1L13 16l-2 1-2.6-5.4L5 14.5z"/></svg><span>Holes</span><kbd>V</kbd></button>
+        <button class="tool" data-tool="place" aria-pressed="false" title="Place a hole by hand (H)">
+          <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="5.5"/><path d="M10 1.5v4M10 14.5v4M1.5 10h4M14.5 10h4"/></svg><span>Place</span><kbd>H</kbd></button>
+        <button class="tool" data-tool="measure" aria-pressed="false" title="Measure between two points (R)">
+          <svg viewBox="0 0 20 20"><path d="M3 14.5L14.5 3 17 5.5 5.5 17z"/><path d="M6.5 11l1.5 1.5M9 8.5l1.5 1.5M11.5 6l1.5 1.5"/></svg><span>Measure</span><kbd>R</kbd></button>
+      </div>
+
+      <div class="view-tools" id="view-tools">
+        <div class="seg dark" id="view-seg">
+          <button class="seg-btn" data-view="iso">3D</button>
+          <button class="seg-btn" data-view="top">Top</button>
+          <button class="seg-btn" data-view="front">Front</button>
+        </div>
+        <button class="seg-btn dark-toggle" id="btn-fit" title="Fit view (F)">Fit</button>
+        <details class="view-more">
+          <summary class="seg-btn dark-toggle" title="Show and hide">Show</summary>
+          <div class="vm-menu">
+            <label><input type="checkbox" id="chk-path" checked> Tip travel</label>
+            <label><input type="checkbox" id="chk-iron" checked> Iron at the hole you point at <kbd>I</kbd></label>
+            <label id="lab-xray"><input type="checkbox" id="chk-xray"> See through the part</label>
+          </div>
+        </details>
+      </div>
+      <div class="legend" id="legend">
+        <span><i class="sw found"></i>Found</span>
+        <span><i class="sw used"></i>Pressing</span>
+        <span><i class="sw path"></i>Tip travel</span>
+      </div>
+      <div class="tip-card" id="tip-card" hidden></div>
+      <div class="add-hint" id="add-hint" hidden></div>
+      <div class="snap-label" id="snap-label" hidden></div>
+      <div class="rot-handle" id="rot-handle" hidden title="Drag to turn (snaps to 15°, Alt for free)" aria-label="Turn the part">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2.05-4.95"/><path d="M17.5 3.5v4h-4"/></svg>
+        <span class="rot-deg" id="rot-deg"></span>
+      </div>
+      <div class="measure-card" id="measure-card" hidden></div>
+      <div class="status" id="status"></div>
+
+      <div class="timeline" id="timeline" hidden>
+        <button class="play" id="sim-play" aria-label="Play preview" title="Play / pause (Space)">
+          <svg class="i-play" viewBox="0 0 20 20"><path d="M6 4l10 6-10 6z"/></svg>
+          <svg class="i-pause" viewBox="0 0 20 20"><path d="M6 4h3v12H6zM11 4h3v12h-3z"/></svg>
+        </button>
+        <div class="tl-main">
+          <div class="tl-read">
+            <span id="sim-what">Ready</span>
+            <span class="tl-time" id="sim-time">0:00 / 0:00</span>
+          </div>
+          <input type="range" id="sim-range" min="0" max="1000" value="0" aria-label="Preview time">
+        </div>
+        <select id="sim-speed" aria-label="Preview speed">
+          <option value="1">1×</option>
+          <option value="4" selected>4×</option>
+          <option value="16">16×</option>
+          <option value="64">64×</option>
+        </select>
+        <div class="tl-xyz" id="sim-xyz"></div>
+      </div>
+    </main>
+  </div>
+
+  <dialog class="setup" id="setup" aria-label="Machine setup"></dialog>
+
+  <div class="drop-veil" id="drop-veil" hidden><p>Release to open</p></div>
+  <input type="file" id="file-stl" accept=".stl,model/stl" hidden>
+  <input type="file" id="file-job" accept=".json,.ipjob,application/json" hidden>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog class="keys" id="keys" aria-label="Keyboard shortcuts">
+    <div class="keys-head"><h2>Keyboard</h2><button class="x-btn" data-close aria-label="Close"><svg viewBox="0 0 12 12"><path d="M2 2l8 8M10 2l-8 8"/></svg></button></div>
+    <p class="fine">Nothing needs these; every action has a button too.</p>
+    <table>
+      <tr><td><kbd>M</kbd> <kbd>V</kbd> <kbd>H</kbd> <kbd>R</kbd></td><td>Move parts, pick holes, place a hole, measure</td></tr>
+      <tr><td><kbd>B</kbd></td><td>Pick the face that goes on the bed</td></tr>
+      <tr><td><kbd>Alt</kbd> while dragging</td><td>Move freely, no snapping (Shift: 0.1 mm steps)</td></tr>
+      <tr><td>Shift-click, Shift-drag</td><td>Select holes in the view</td></tr>
+      <tr><td><kbd>Ctrl</kbd> <kbd>A</kbd></td><td>Select every hole shown in the list</td></tr>
+      <tr><td><kbd>Delete</kbd></td><td>Take the selected holes out of the press order</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Clear the measurement, then the selection, then the tool</td></tr>
+      <tr><td>Arrows</td><td>Nudge the part 1 mm with Move (Shift: 10 mm); jog on the machine screen</td></tr>
+      <tr><td><kbd>I</kbd></td><td>Show or hide the iron at the hole you point at</td></tr>
+      <tr><td><kbd>Space</kbd></td><td>Play or pause the preview</td></tr>
+      <tr><td><kbd>F</kbd></td><td>Fit the view</td></tr>
+      <tr><td><kbd>Ctrl</kbd> <kbd>Z</kbd></td><td>Undo (add Shift to redo)</td></tr>
+    </table>
+  </dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="js/stl.js?v=6"></script>
+  <script src="js/holes.js?v=6"></script>
+  <script src="js/tray.js?v=6"></script>
+  <script src="js/gcode.js?v=6"></script>
+  <script src="js/placement.js?v=6"></script>
+  <script src="js/snap.js?v=6"></script>
+  <script src="js/example.js?v=6"></script>
+  <script src="js/collision.js?v=6"></script>
+  <script src="js/holelist.js?v=6"></script>
+  <script src="js/measure.js?v=6"></script>
+  <script src="js/grbl.js?v=6"></script>
+  <script src="js/grbl-sim.js?v=6"></script>
+  <script src="js/serial.js?v=6"></script>
+  <script src="js/store.js?v=6"></script>
+  <script src="js/thumb.js?v=6"></script>
+  <script src="js/viewer.js?v=6"></script>
+  <script src="js/viewer2d.js?v=6"></script>
+  <script src="js/ui-setup.js?v=6"></script>
+  <script src="js/ui-start.js?v=6"></script>
+  <script src="js/ui-part.js?v=6"></script>
+  <script src="js/ui-holes.js?v=6"></script>
+  <script src="js/ui-review.js?v=6"></script>
+  <script src="js/ui-machine.js?v=6"></script>
+  <script src="js/app.js?v=6"></script>
+</body>
+</html>
